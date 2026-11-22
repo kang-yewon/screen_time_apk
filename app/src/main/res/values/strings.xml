@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">벽돌 타이머</string>
-    <string name="accessibility_service_description">벽돌 타이머 잠금 시간 동안 전화 외 다른 앱의 실행을 차단하고 시계 잠금화면을 유지합니다.</string>
+    <string name="app_name">FocusLock</string>
 </resources>

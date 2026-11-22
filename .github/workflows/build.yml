@@ -34,26 +34,28 @@ jobs:
 
       - name: Rename APKs
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk BrickLock-debug.apk
-          cp app/build/outputs/apk/release/app-release.apk BrickLock-release.apk
+          cp app/build/outputs/apk/debug/app-debug.apk FocusLock-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk FocusLock-release.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BrickLock-APK
+          name: FocusLock-APK
           path: |
-            BrickLock-debug.apk
-            BrickLock-release.apk
+            FocusLock-debug.apk
+            FocusLock-release.apk
 
       - name: Create or Update GitHub Release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: "벽돌 타이머 (BrickLock) APK v1.0.${{ github.run_number }}"
+          tag_name: v2.0.${{ github.run_number }}
+          name: "FocusLock APK v2.0.${{ github.run_number }}"
           body: |
-            스크린타임 조절 벽돌 타이머 APK 빌드입니다.
-            - `BrickLock-release.apk` 또는 `BrickLock-debug.apk`를 다운로드하여 안드로이드 휴대폰에 설치하세요.
+            스크린타임 조절 FocusLock APK 빌드입니다.
+            - 접근성(제한된 설정) 권한 없이 **[다른 앱 위에 표시]** 화면 고정 오버레이로 홈 화면/타 앱 이탈을 원천 차단합니다.
+            - 12시간제(오전/오후) 시계 표시 및 전화 걸기 기능을 지원합니다.
+            - `FocusLock-release.apk`를 다운로드하여 안드로이드 휴대폰에 설치하세요.
           files: |
-            BrickLock-debug.apk
-            BrickLock-release.apk
+            FocusLock-debug.apk
+            FocusLock-release.apk

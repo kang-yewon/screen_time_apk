@@ -24,7 +24,8 @@ class LockScreenActivity : AppCompatActivity() {
     private lateinit var btnPhone: Button
 
     private val handler = Handler(Looper.getMainLooper())
-    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    // 12-hour clock format (e.g., 오후 05:27:14)
+    private val timeFormat = SimpleDateFormat("a hh:mm:ss", Locale.KOREAN)
     private val dateFormat = SimpleDateFormat("yyyy년 MM월 dd일 (EEE)", Locale.KOREAN)
 
     private val updateRunnable = object : Runnable {
@@ -120,6 +121,7 @@ class LockScreenActivity : AppCompatActivity() {
     }
 
     private fun openPhoneDialer() {
+        LockForegroundService.allowDialerTemporarily(30)
         try {
             val dialIntent = Intent(Intent.ACTION_DIAL).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

@@ -5,16 +5,16 @@
     android:background="#000000"
     android:gravity="center"
     android:orientation="vertical"
-    android:padding="32dp">
+    android:padding="28dp">
 
     <TextView
         android:id="@+id/tvClockTime"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:fontFamily="sans-serif-light"
-        android:text="00:00:00"
+        android:text="오후 12:00:00"
         android:textColor="#FFFFFF"
-        android:textSize="64sp"
+        android:textSize="48sp"
         android:textStyle="bold" />
 
     <TextView
@@ -22,15 +22,15 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="2026년 01월 01일"
+        android:text="2026년 01월 01일 (목)"
         android:textColor="#9AA0A6"
-        android:textSize="18sp" />
+        android:textSize="17sp" />
 
     <TextView
         android:id="@+id/tvRemaining"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="48dp"
+        android:layout_marginTop="40dp"
         android:background="#1A1A1A"
         android:paddingStart="20dp"
         android:paddingTop="12dp"
@@ -44,21 +44,32 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="14dp"
         android:gravity="center"
-        android:text="벽돌 모드 실행 중입니다.\n무음 및 알림·앱 진입이 차단되었습니다."
+        android:text="FocusLock 실행 중입니다.\n무음 및 화면 고정이 유지됩니다."
         android:textColor="#666666"
         android:textSize="13sp" />
 
     <Button
         android:id="@+id/btnPhone"
         android:layout_width="220dp"
-        android:layout_height="58dp"
-        android:layout_marginTop="64dp"
+        android:layout_height="56dp"
+        android:layout_marginTop="52dp"
         android:backgroundTint="#1E88E5"
         android:text="전화 걸기"
         android:textColor="#FFFFFF"
         android:textSize="18sp"
         android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/btnReturnLock"
+        android:layout_width="220dp"
+        android:layout_height="44dp"
+        android:layout_marginTop="12dp"
+        android:backgroundTint="#2A2A34"
+        android:text="통화 후 잠금화면 복귀 (25초 뒤 자동복귀)"
+        android:textColor="#CCCCCC"
+        android:textSize="11sp"
+        android:visibility="gone" />
 
 </LinearLayout>
