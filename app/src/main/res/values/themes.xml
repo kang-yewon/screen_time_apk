@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.BrickLock" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:statusBarColor">#0F0F12</item>
+        <item name="android:navigationBarColor">#0F0F12</item>
+        <item name="android:windowBackground">#0F0F12</item>
+    </style>
+
+    <style name="Theme.BrickLock.LockScreen" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+
+    <style name="AlertDialogDark" parent="Theme.AppCompat.Dialog.Alert">
+        <item name="android:background">#1C1C22</item>
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColor">#E8EAED</item>
+    </style>
+</resources>
