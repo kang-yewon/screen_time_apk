@@ -184,7 +184,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:text="접근성 권한 없이 아래 2개 권한만으로 완벽히 잠급니다."
+                android:text="접근성(제한된 설정) 없이 아래 권한들을 켜주세요."
                 android:textColor="#9AA0A6"
                 android:textSize="13sp" />
 
@@ -205,6 +205,26 @@
                 android:layout_marginTop="8dp"
                 android:backgroundTint="#2E2E3A"
                 android:text="2. 방해금지(무음/알림차단) 권한 허용하기"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnGrantUsage"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:backgroundTint="#2E2E3A"
+                android:text="3. 전화 외 타 앱 이탈 감지(사용정보 접근) 허용하기"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnGrantCall"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:backgroundTint="#2E2E3A"
+                android:text="4. 전화 바로 발신 권한 허용하기"
                 android:textColor="#FFFFFF"
                 android:textSize="13sp" />
         </LinearLayout>

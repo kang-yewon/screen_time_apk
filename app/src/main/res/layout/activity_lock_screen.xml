@@ -1,75 +1,181 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000"
-    android:gravity="center"
-    android:orientation="vertical"
-    android:padding="28dp">
+    android:background="#000000">
 
-    <TextView
-        android:id="@+id/tvClockTime"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:fontFamily="sans-serif-light"
-        android:text="오후 12:00:00"
-        android:textColor="#FFFFFF"
-        android:textSize="48sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/tvClockDate"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="2026년 01월 01일 (목)"
-        android:textColor="#9AA0A6"
-        android:textSize="17sp" />
-
-    <TextView
-        android:id="@+id/tvRemaining"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="40dp"
-        android:background="#1A1A1A"
-        android:paddingStart="20dp"
-        android:paddingTop="12dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="12dp"
-        android:text="남은 잠금 시간  00:00:00"
-        android:textColor="#FF5252"
-        android:textSize="18sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
+    <!-- 1. Clock Lock View -->
+    <LinearLayout
+        android:id="@+id/layoutClockContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:gravity="center"
-        android:text="FocusLock 실행 중입니다.\n무음 및 화면 고정이 유지됩니다."
-        android:textColor="#666666"
-        android:textSize="13sp" />
+        android:orientation="vertical"
+        android:padding="28dp"
+        android:visibility="visible">
 
-    <Button
-        android:id="@+id/btnPhone"
-        android:layout_width="220dp"
-        android:layout_height="56dp"
-        android:layout_marginTop="52dp"
-        android:backgroundTint="#1E88E5"
-        android:text="전화 걸기"
-        android:textColor="#FFFFFF"
-        android:textSize="18sp"
-        android:textStyle="bold" />
+        <TextView
+            android:id="@+id/tvClockTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-light"
+            android:text="오후 12:00:00"
+            android:textColor="#FFFFFF"
+            android:textSize="48sp"
+            android:textStyle="bold" />
 
-    <Button
-        android:id="@+id/btnReturnLock"
-        android:layout_width="220dp"
-        android:layout_height="44dp"
-        android:layout_marginTop="12dp"
-        android:backgroundTint="#2A2A34"
-        android:text="통화 후 잠금화면 복귀 (25초 뒤 자동복귀)"
-        android:textColor="#CCCCCC"
-        android:textSize="11sp"
-        android:visibility="gone" />
+        <TextView
+            android:id="@+id/tvClockDate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="2026년 01월 01일 (목)"
+            android:textColor="#9AA0A6"
+            android:textSize="17sp" />
 
-</LinearLayout>
+        <TextView
+            android:id="@+id/tvRemaining"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="40dp"
+            android:background="#1A1A1A"
+            android:paddingStart="20dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="12dp"
+            android:text="남은 잠금 시간  00:00:00"
+            android:textColor="#FF5252"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center"
+            android:text="FocusLock 실행 중입니다.\n무음 및 화면 고정이 유지됩니다."
+            android:textColor="#666666"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btnPhone"
+            android:layout_width="220dp"
+            android:layout_height="56dp"
+            android:layout_marginTop="52dp"
+            android:backgroundTint="#1E88E5"
+            android:text="전화 걸기"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- 2. Built-in Dialpad View (Inside Lock Screen Overlay) -->
+    <LinearLayout
+        android:id="@+id/layoutDialerContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="FocusLock 안전 다이얼"
+            android:textColor="#9AA0A6"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tvPhoneInput"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="20dp"
+            android:background="#16161C"
+            android:gravity="center"
+            android:text="전화번호 입력"
+            android:textColor="#FFFFFF"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button android:id="@+id/btnKey1" android:layout_width="0dp" android:layout_height="64dp" android:layout_margin="4dp" android:layout_weight="1" android:backgroundTint="#1F1F27" android:text="1" android:textColor="#FFFFFF" android:textSize="22sp" />
+            <Button android:id="@+id/btnKey2" android:layout_width="0dp" android:layout_height="64dp" android:layout_margin="4dp" android:layout_weight="1" android:backgroundTint="#1F1F27" android:text="2" android:textColor="#FFFFFF" android:textSize="22sp" />
+            <Button android:id="@+id/btnKey3" android:layout_width="0dp" android:layout_height="64dp" android:layout_margin="4dp" android:layout_weight="1" android:backgroundTint="#1F1F27" android:text="3" android:textColor="#FFFFFF" android:textSize="22sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button android:id="@+id/btnKey4" android:layout_width="0dp" android:layout_height="64dp" android:layout_margin="4dp" android:layout_weight="1" android:backgroundTint="#1F1F27" android:text="4" android:textColor="#FFFFFF" android:textSize="22sp" />
+            <Button android:id="@+id/btnKey5" android:layout_width="0dp" android:layout_height="64dp" android:layout_margin="4dp" android:layout_weight="1" android:backgroundTint="#1F1F27" android:text="5" android:textColor="#FFFFFF" android:textSize="22sp" />
+            <Button android:id="@+id/btnKey6" android:layout_width="0dp" android:layout_height="64dp" android:layout_margin="4dp" android:layout_weight="1" android:backgroundTint="#1F1F27" android:text="6" android:textColor="#FFFFFF" android:textSize="22sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button android:id="@+id/btnKey7" android:layout_width="0dp" android:layout_height="64dp" android:layout_margin="4dp" android:layout_weight="1" android:backgroundTint="#1F1F27" android:text="7" android:textColor="#FFFFFF" android:textSize="22sp" />
+            <Button android:id="@+id/btnKey8" android:layout_width="0dp" android:layout_height="64dp" android:layout_margin="4dp" android:layout_weight="1" android:backgroundTint="#1F1F27" android:text="8" android:textColor="#FFFFFF" android:textSize="22sp" />
+            <Button android:id="@+id/btnKey9" android:layout_width="0dp" android:layout_height="64dp" android:layout_margin="4dp" android:layout_weight="1" android:backgroundTint="#1F1F27" android:text="9" android:textColor="#FFFFFF" android:textSize="22sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button android:id="@+id/btnKeyStar" android:layout_width="0dp" android:layout_height="64dp" android:layout_margin="4dp" android:layout_weight="1" android:backgroundTint="#1F1F27" android:text="*" android:textColor="#FFFFFF" android:textSize="22sp" />
+            <Button android:id="@+id/btnKey0" android:layout_width="0dp" android:layout_height="64dp" android:layout_margin="4dp" android:layout_weight="1" android:backgroundTint="#1F1F27" android:text="0" android:textColor="#FFFFFF" android:textSize="22sp" />
+            <Button android:id="@+id/btnKeyHash" android:layout_width="0dp" android:layout_height="64dp" android:layout_margin="4dp" android:layout_weight="1" android:backgroundTint="#1F1F27" android:text="#" android:textColor="#FFFFFF" android:textSize="22sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnCancelDial"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_margin="4dp"
+                android:layout_weight="1"
+                android:backgroundTint="#42424E"
+                android:text="시계로 돌아가기"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnKeyDelete"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_margin="4dp"
+                android:layout_weight="1"
+                android:backgroundTint="#42424E"
+                android:text="지우기 (⌫)"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnMakeCall"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="8dp"
+            android:backgroundTint="#2E7D32"
+            android:text="📞 통화 발신"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+</FrameLayout>

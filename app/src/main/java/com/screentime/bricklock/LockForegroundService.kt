@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -34,10 +35,17 @@ class LockForegroundService : Service() {
 
     private var windowManager: WindowManager? = null
     private var overlayView: View? = null
+
+    private var layoutClockContainer: View? = null
+    private var layoutDialerContainer: View? = null
+
     private var tvOverlayClockTime: TextView? = null
     private var tvOverlayClockDate: TextView? = null
     private var tvOverlayRemaining: TextView? = null
     private var btnOverlayPhone: Button? = null
+
+    private var tvPhoneInput: TextView? = null
+    private var currentPhoneNumber = StringBuilder()
 
     private var miniReturnView: View? = null
 
@@ -46,14 +54,14 @@ class LockForegroundService : Service() {
     private val dateFormat = SimpleDateFormat("yyyy년 MM월 dd일 (EEE)", Locale.KOREAN)
 
     companion object {
-        private var dialerGraceUntilMillis: Long = 0L
+        private var dialerLaunchedAtMillis: Long = 0L
 
-        fun allowDialerTemporarily(seconds: Int = 30) {
-            dialerGraceUntilMillis = System.currentTimeMillis() + seconds * 1000L
+        fun notifyCallLaunched() {
+            dialerLaunchedAtMillis = System.currentTimeMillis()
         }
 
         fun endDialerGrace() {
-            dialerGraceUntilMillis = 0L
+            dialerLaunchedAtMillis = 0L
         }
     }
 
@@ -70,8 +78,8 @@ class LockForegroundService : Service() {
             LockManager.enforceSilentAndDnd(this@LockForegroundService)
             updateNotification()
 
-            val inDialerGrace = System.currentTimeMillis() < dialerGraceUntilMillis
-            if (inDialerGrace) {
+            val shouldAllowPhoneScreen = shouldHideOverlayForPhoneCall()
+            if (shouldAllowPhoneScreen) {
                 overlayView?.visibility = View.GONE
                 ensureMiniReturnButtonShown()
             } else {
@@ -81,7 +89,36 @@ class LockForegroundService : Service() {
                 updateOverlayTexts()
             }
 
-            handler.postDelayed(this, 500L)
+            // Fast 200ms check so leaving phone app to home/other apps immediately covers the screen
+            handler.postDelayed(this, 200L)
+        }
+    }
+
+    private fun shouldHideOverlayForPhoneCall(): Boolean {
+        val elapsedSinceLaunch = System.currentTimeMillis() - dialerLaunchedAtMillis
+        if (dialerLaunchedAtMillis <= 0L) return false
+
+        // Give 1.5s transition time right after pressing Call button for phone app to come to foreground
+        if (elapsedSinceLaunch < 1500L) {
+            return true
+        }
+
+        if (LockManager.isUsageAccessGranted(this)) {
+            val fgPkg = LockManager.getCurrentForegroundPackage(this)
+            val isPhoneFg = LockManager.isPhoneOrDialerPackage(this, fgPkg)
+            if (!isPhoneFg) {
+                // User pressed Home or switched to another app -> immediately re-lock!
+                dialerLaunchedAtMillis = 0L
+                return false
+            }
+            return true
+        } else {
+            // Fallback if usage access not granted: only allow 8 seconds
+            if (elapsedSinceLaunch > 8000L) {
+                dialerLaunchedAtMillis = 0L
+                return false
+            }
+            return true
         }
     }
 
@@ -129,23 +166,24 @@ class LockForegroundService : Service() {
                 keyCode == KeyEvent.KEYCODE_BACK
             }
 
+            layoutClockContainer = view.findViewById(R.id.layoutClockContainer)
+            layoutDialerContainer = view.findViewById(R.id.layoutDialerContainer)
+
             tvOverlayClockTime = view.findViewById(R.id.tvClockTime)
             tvOverlayClockDate = view.findViewById(R.id.tvClockDate)
             tvOverlayRemaining = view.findViewById(R.id.tvRemaining)
             btnOverlayPhone = view.findViewById(R.id.btnPhone)
+            tvPhoneInput = view.findViewById(R.id.tvPhoneInput)
 
             btnOverlayPhone?.setOnClickListener {
-                allowDialerTemporarily(30)
-                view.visibility = View.GONE
-                ensureMiniReturnButtonShown()
-                try {
-                    val dialIntent = Intent(Intent.ACTION_DIAL).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivity(dialIntent)
-                } catch (_: Exception) {
-                }
+                // Show built-in dialpad inside the lock overlay so user cannot escape to home screen
+                currentPhoneNumber.clear()
+                updatePhoneInputDisplay()
+                layoutClockContainer?.visibility = View.GONE
+                layoutDialerContainer?.visibility = View.VISIBLE
             }
+
+            setupBuiltInDialpad(view)
 
             val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -176,6 +214,71 @@ class LockForegroundService : Service() {
             updateOverlayTexts()
         } catch (_: Exception) {
         }
+    }
+
+    private fun setupBuiltInDialpad(root: View) {
+        val digitButtons = mapOf(
+            R.id.btnKey0 to "0",
+            R.id.btnKey1 to "1",
+            R.id.btnKey2 to "2",
+            R.id.btnKey3 to "3",
+            R.id.btnKey4 to "4",
+            R.id.btnKey5 to "5",
+            R.id.btnKey6 to "6",
+            R.id.btnKey7 to "7",
+            R.id.btnKey8 to "8",
+            R.id.btnKey9 to "9",
+            R.id.btnKeyStar to "*",
+            R.id.btnKeyHash to "#"
+        )
+
+        for ((id, digit) in digitButtons) {
+            root.findViewById<Button>(id)?.setOnClickListener {
+                if (currentPhoneNumber.length < 15) {
+                    currentPhoneNumber.append(digit)
+                    updatePhoneInputDisplay()
+                }
+            }
+        }
+
+        root.findViewById<Button>(R.id.btnKeyDelete)?.setOnClickListener {
+            if (currentPhoneNumber.isNotEmpty()) {
+                currentPhoneNumber.deleteCharAt(currentPhoneNumber.length - 1)
+                updatePhoneInputDisplay()
+            }
+        }
+
+        root.findViewById<Button>(R.id.btnCancelDial)?.setOnClickListener {
+            layoutDialerContainer?.visibility = View.GONE
+            layoutClockContainer?.visibility = View.VISIBLE
+        }
+
+        root.findViewById<Button>(R.id.btnMakeCall)?.setOnClickListener {
+            val number = currentPhoneNumber.toString().trim()
+            if (number.isEmpty()) return@setOnClickListener
+
+            layoutDialerContainer?.visibility = View.GONE
+            layoutClockContainer?.visibility = View.VISIBLE
+            notifyCallLaunched()
+            overlayView?.visibility = View.GONE
+            ensureMiniReturnButtonShown()
+
+            try {
+                val hasCallPerm = checkSelfPermission(android.Manifest.permission.CALL_PHONE) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                val action = if (hasCallPerm) Intent.ACTION_CALL else Intent.ACTION_DIAL
+                val callIntent = Intent(action, Uri.parse("tel:${Uri.encode(number)}")).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(callIntent)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun updatePhoneInputDisplay() {
+        val raw = currentPhoneNumber.toString()
+        tvPhoneInput?.text = if (raw.isEmpty()) "전화번호 입력" else raw
     }
 
     private fun ensureMiniReturnButtonShown() {

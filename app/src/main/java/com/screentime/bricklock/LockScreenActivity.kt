@@ -1,10 +1,12 @@
 package com.screentime.bricklock
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
@@ -18,10 +20,15 @@ import java.util.Locale
 
 class LockScreenActivity : AppCompatActivity() {
 
+    private lateinit var layoutClockContainer: View
+    private lateinit var layoutDialerContainer: View
     private lateinit var tvClockTime: TextView
     private lateinit var tvClockDate: TextView
     private lateinit var tvRemaining: TextView
     private lateinit var btnPhone: Button
+    private lateinit var tvPhoneInput: TextView
+
+    private val currentPhoneNumber = StringBuilder()
 
     private val handler = Handler(Looper.getMainLooper())
     // 12-hour clock format (e.g., 오후 05:27:14)
@@ -73,20 +80,94 @@ class LockScreenActivity : AppCompatActivity() {
 
         hideSystemUI()
 
+        layoutClockContainer = findViewById(R.id.layoutClockContainer)
+        layoutDialerContainer = findViewById(R.id.layoutDialerContainer)
         tvClockTime = findViewById(R.id.tvClockTime)
         tvClockDate = findViewById(R.id.tvClockDate)
         tvRemaining = findViewById(R.id.tvRemaining)
         btnPhone = findViewById(R.id.btnPhone)
+        tvPhoneInput = findViewById(R.id.tvPhoneInput)
 
         btnPhone.setOnClickListener {
-            openPhoneDialer()
+            currentPhoneNumber.clear()
+            updatePhoneInputDisplay()
+            layoutClockContainer.visibility = View.GONE
+            layoutDialerContainer.visibility = View.VISIBLE
         }
+
+        setupBuiltInDialpad()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                // Ignore back button while locked
+                if (layoutDialerContainer.visibility == View.VISIBLE) {
+                    layoutDialerContainer.visibility = View.GONE
+                    layoutClockContainer.visibility = View.VISIBLE
+                }
             }
         })
+    }
+
+    private fun setupBuiltInDialpad() {
+        val digitButtons = mapOf(
+            R.id.btnKey0 to "0",
+            R.id.btnKey1 to "1",
+            R.id.btnKey2 to "2",
+            R.id.btnKey3 to "3",
+            R.id.btnKey4 to "4",
+            R.id.btnKey5 to "5",
+            R.id.btnKey6 to "6",
+            R.id.btnKey7 to "7",
+            R.id.btnKey8 to "8",
+            R.id.btnKey9 to "9",
+            R.id.btnKeyStar to "*",
+            R.id.btnKeyHash to "#"
+        )
+
+        for ((id, digit) in digitButtons) {
+            findViewById<Button>(id).setOnClickListener {
+                if (currentPhoneNumber.length < 15) {
+                    currentPhoneNumber.append(digit)
+                    updatePhoneInputDisplay()
+                }
+            }
+        }
+
+        findViewById<Button>(R.id.btnKeyDelete).setOnClickListener {
+            if (currentPhoneNumber.isNotEmpty()) {
+                currentPhoneNumber.deleteCharAt(currentPhoneNumber.length - 1)
+                updatePhoneInputDisplay()
+            }
+        }
+
+        findViewById<Button>(R.id.btnCancelDial).setOnClickListener {
+            layoutDialerContainer.visibility = View.GONE
+            layoutClockContainer.visibility = View.VISIBLE
+        }
+
+        findViewById<Button>(R.id.btnMakeCall).setOnClickListener {
+            val number = currentPhoneNumber.toString().trim()
+            if (number.isEmpty()) return@setOnClickListener
+
+            layoutDialerContainer.visibility = View.GONE
+            layoutClockContainer.visibility = View.VISIBLE
+            LockForegroundService.notifyCallLaunched()
+
+            try {
+                val hasCallPerm = checkSelfPermission(android.Manifest.permission.CALL_PHONE) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                val action = if (hasCallPerm) Intent.ACTION_CALL else Intent.ACTION_DIAL
+                val callIntent = Intent(action, Uri.parse("tel:${Uri.encode(number)}")).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(callIntent)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun updatePhoneInputDisplay() {
+        val raw = currentPhoneNumber.toString()
+        tvPhoneInput.text = if (raw.isEmpty()) "전화번호 입력" else raw
     }
 
     override fun onResume() {
@@ -117,17 +198,6 @@ class LockScreenActivity : AppCompatActivity() {
                 or android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                 or android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
             )
-        }
-    }
-
-    private fun openPhoneDialer() {
-        LockForegroundService.allowDialerTemporarily(30)
-        try {
-            val dialIntent = Intent(Intent.ACTION_DIAL).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            startActivity(dialIntent)
-        } catch (_: Exception) {
         }
     }
 }

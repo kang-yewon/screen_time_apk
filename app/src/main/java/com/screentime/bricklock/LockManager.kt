@@ -1,19 +1,22 @@
 package com.screentime.bricklock
 
+import android.app.AppOpsManager
 import android.app.NotificationManager
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
+import android.os.Process
 
 object LockManager {
     private const val PREF_NAME = "brick_lock_prefs"
     private const val KEY_END_TIME = "lock_end_time_millis"
     private const val KEY_PREV_RINGER = "prev_ringer_mode"
     private const val KEY_PREV_FILTER = "prev_interruption_filter"
+
+    private var lastKnownForegroundPkg: String? = null
 
     fun getEndTime(context: Context): Long {
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
@@ -67,7 +70,6 @@ object LockManager {
         try {
             val notifManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             if (notifManager.isNotificationPolicyAccessGranted) {
-                // Allow priority notifications (phone calls only if configured, or priority mode)
                 notifManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_NONE)
             }
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -99,28 +101,93 @@ object LockManager {
         }
     }
 
-    fun isAllowedPackage(context: Context, packageName: String?): Boolean {
-        if (packageName.isNullOrBlank()) return true
-        if (packageName == context.packageName) return true
+    fun isUsageAccessGranted(context: Context): Boolean {
+        return try {
+            val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                appOps.unsafeCheckOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    Process.myUid(),
+                    context.packageName
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                appOps.checkOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    Process.myUid(),
+                    context.packageName
+                )
+            }
+            mode == AppOpsManager.MODE_ALLOWED
+        } catch (_: Exception) {
+            false
+        }
+    }
 
+    fun getCurrentForegroundPackage(context: Context): String? {
+        if (!isUsageAccessGranted(context)) return null
+        try {
+            val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            val end = System.currentTimeMillis()
+            val start = end - 15_000L
+            val events = usm.queryEvents(start, end)
+            val event = UsageEvents.Event()
+            var latestPkg: String? = null
+            var latestTime = 0L
+
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
+                    event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND
+                ) {
+                    if (event.timeStamp >= latestTime) {
+                        latestTime = event.timeStamp
+                        latestPkg = event.packageName
+                    }
+                }
+            }
+            if (!latestPkg.isNullOrBlank()) {
+                lastKnownForegroundPkg = latestPkg
+            }
+        } catch (_: Exception) {
+        }
+        return lastKnownForegroundPkg
+    }
+
+    fun isPhoneOrDialerPackage(context: Context, packageName: String?): Boolean {
+        if (packageName.isNullOrBlank()) return false
         val lower = packageName.lowercase()
-        // Allow phone / dialer / incoming call / telecom / emergency packages and system UI
-        val allowedKeywords = listOf(
+
+        // Exclude launchers / home screen / settings / browsers explicitly
+        val blockedKeywords = listOf(
+            "launcher",
+            "home",
+            "trebuchet",
+            "nexuslauncher",
+            "sec.android.app.launcher",
+            "settings",
+            "chrome",
+            "browser",
+            "youtube",
+            "kakao",
+            "instagram"
+        )
+        if (blockedKeywords.any { lower.contains(it) }) {
+            return false
+        }
+
+        val allowedPhoneKeywords = listOf(
             "dialer",
             "phone",
             "incallui",
             "telecom",
-            "server.telecom",
-            "contacts",
-            "emergency",
-            "systemui",
-            "call"
+            "call",
+            "contacts"
         )
-        if (allowedKeywords.any { lower.contains(it) }) {
+        if (allowedPhoneKeywords.any { lower.contains(it) }) {
             return true
         }
 
-        // Check default dialer dynamically
         try {
             val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
             val defaultDialer = telecomManager?.defaultDialerPackage
