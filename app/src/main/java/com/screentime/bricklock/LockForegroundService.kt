@@ -76,6 +76,7 @@ class LockForegroundService : Service() {
             }
 
             LockManager.enforceSilentAndDnd(this@LockForegroundService)
+            LockManager.scheduleWatchdog(this@LockForegroundService)
             updateNotification()
 
             val shouldAllowPhoneScreen = shouldHideOverlayForPhoneCall()

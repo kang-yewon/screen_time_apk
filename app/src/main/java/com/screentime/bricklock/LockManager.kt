@@ -1,33 +1,59 @@
 package com.screentime.bricklock
 
+import android.app.AlarmManager
 import android.app.AppOpsManager
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.media.AudioManager
 import android.os.Build
 import android.os.Process
+import android.os.SystemClock
 
 object LockManager {
     private const val PREF_NAME = "brick_lock_prefs"
     private const val KEY_END_TIME = "lock_end_time_millis"
+    private const val KEY_REMAINING_MILLIS = "lock_remaining_millis"
     private const val KEY_PREV_RINGER = "prev_ringer_mode"
     private const val KEY_PREV_FILTER = "prev_interruption_filter"
 
     private var lastKnownForegroundPkg: String? = null
 
+    /**
+     * Device-encrypted storage so BootReceiver can read lock state immediately
+     * during Direct Boot (LOCKED_BOOT_COMPLETED) before PIN/pattern unlock,
+     * while migrating existing credential-protected data if present.
+     */
+    private fun getPrefs(context: Context): SharedPreferences {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val deviceContext = context.createDeviceProtectedStorageContext()
+            deviceContext.moveSharedPreferencesFrom(context, PREF_NAME)
+            deviceContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        } else {
+            context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        }
+    }
+
     fun getEndTime(context: Context): Long {
-        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-        return prefs.getLong(KEY_END_TIME, 0L)
+        return getPrefs(context).getLong(KEY_END_TIME, 0L)
     }
 
     fun isLocked(context: Context): Boolean {
-        val endTime = getEndTime(context)
-        if (endTime <= 0L) return false
-        val remaining = endTime - System.currentTimeMillis()
-        if (remaining <= 0L) {
+        val prefs = getPrefs(context)
+        val endTime = prefs.getLong(KEY_END_TIME, 0L)
+        val savedRemaining = prefs.getLong(KEY_REMAINING_MILLIS, 0L)
+        if (endTime <= 0L && savedRemaining <= 0L) return false
+
+        val now = System.currentTimeMillis()
+        val computedRemaining = endTime - now
+
+        // If wall-clock jumped ahead right after reboot or hasn't synced properly,
+        // or if endTime needs to be restored from savedRemaining on boot:
+        if (computedRemaining <= 0L && savedRemaining <= 0L) {
             stopLock(context)
             return false
         }
@@ -35,34 +61,99 @@ object LockManager {
     }
 
     fun getRemainingMillis(context: Context): Long {
-        val endTime = getEndTime(context)
+        val prefs = getPrefs(context)
+        val endTime = prefs.getLong(KEY_END_TIME, 0L)
         if (endTime <= 0L) return 0L
-        return (endTime - System.currentTimeMillis()).coerceAtLeast(0L)
+        val remaining = (endTime - System.currentTimeMillis()).coerceAtLeast(0L)
+        // Persist latest remaining time every tick so power-off cannot cheat or lose state
+        prefs.edit().putLong(KEY_REMAINING_MILLIS, remaining).apply()
+        if (remaining == 0L) {
+            stopLock(context)
+        }
+        return remaining
+    }
+
+    /**
+     * Called on device boot/reboot to ensure endTime is valid even if wall clock changed while powered off.
+     */
+    fun restoreLockAfterBoot(context: Context): Boolean {
+        val prefs = getPrefs(context)
+        val endTime = prefs.getLong(KEY_END_TIME, 0L)
+        val savedRemaining = prefs.getLong(KEY_REMAINING_MILLIS, 0L)
+        if (endTime <= 0L && savedRemaining <= 0L) return false
+
+        val now = System.currentTimeMillis()
+        val wallRemaining = endTime - now
+
+        if (wallRemaining > 0L) {
+            prefs.edit().putLong(KEY_REMAINING_MILLIS, wallRemaining).apply()
+            scheduleWatchdog(context)
+            return true
+        } else if (savedRemaining > 15_000L && wallRemaining < -86_400_000L) {
+            // Clock anomaly protection
+            val newEnd = now + savedRemaining
+            prefs.edit().putLong(KEY_END_TIME, newEnd).apply()
+            scheduleWatchdog(context)
+            return true
+        } else {
+            stopLock(context)
+            return false
+        }
     }
 
     fun startLock(context: Context, durationMillis: Long) {
         val endTime = System.currentTimeMillis() + durationMillis
-        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
 
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val notifManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         prefs.edit().apply {
             putLong(KEY_END_TIME, endTime)
+            putLong(KEY_REMAINING_MILLIS, durationMillis)
             putInt(KEY_PREV_RINGER, audioManager.ringerMode)
             if (notifManager.isNotificationPolicyAccessGranted) {
                 putInt(KEY_PREV_FILTER, notifManager.currentInterruptionFilter)
             }
-            apply()
+            commit() // Synchronous commit so immediate power-off still saves to disk
         }
 
         enforceSilentAndDnd(context)
+        scheduleWatchdog(context)
+        startLockServiceAndOverlay(context)
+    }
 
-        val serviceIntent = Intent(context, LockForegroundService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(serviceIntent)
-        } else {
-            context.startService(serviceIntent)
+    fun startLockServiceAndOverlay(context: Context) {
+        try {
+            val serviceIntent = Intent(context, LockForegroundService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    fun scheduleWatchdog(context: Context) {
+        try {
+            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, BootReceiver::class.java).apply {
+                action = BootReceiver.ACTION_WATCHDOG
+            }
+            val pi = PendingIntent.getBroadcast(
+                context,
+                777,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val triggerAt = SystemClock.elapsedRealtime() + 5_000L
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                am.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pi)
+            } else {
+                am.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pi)
+            }
+        } catch (_: Exception) {
         }
     }
 
@@ -79,11 +170,14 @@ object LockManager {
     }
 
     fun stopLock(context: Context) {
-        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        val prefs = getPrefs(context)
         val prevRinger = prefs.getInt(KEY_PREV_RINGER, AudioManager.RINGER_MODE_NORMAL)
         val prevFilter = prefs.getInt(KEY_PREV_FILTER, NotificationManager.INTERRUPTION_FILTER_ALL)
 
-        prefs.edit().putLong(KEY_END_TIME, 0L).apply()
+        prefs.edit()
+            .putLong(KEY_END_TIME, 0L)
+            .putLong(KEY_REMAINING_MILLIS, 0L)
+            .commit()
 
         try {
             val notifManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -158,7 +252,6 @@ object LockManager {
         if (packageName.isNullOrBlank()) return false
         val lower = packageName.lowercase()
 
-        // Exclude launchers / home screen / settings / browsers explicitly
         val blockedKeywords = listOf(
             "launcher",
             "home",

@@ -3,21 +3,34 @@ package com.screentime.bricklock
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 
 class BootReceiver : BroadcastReceiver() {
+
+    companion object {
+        const val ACTION_WATCHDOG = "com.screentime.focuslock.ACTION_WATCHDOG"
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
-            intent.action == Intent.ACTION_LOCKED_BOOT_COMPLETED
-        ) {
-            if (LockManager.isLocked(context)) {
+        val action = intent.action ?: return
+
+        val isBootEvent = action == Intent.ACTION_BOOT_COMPLETED ||
+            action == Intent.ACTION_LOCKED_BOOT_COMPLETED ||
+            action == Intent.ACTION_USER_UNLOCKED ||
+            action == Intent.ACTION_MY_PACKAGE_REPLACED ||
+            action == "android.intent.action.QUICKBOOT_POWERON" ||
+            action == "com.htc.intent.action.QUICKBOOT_POWERON"
+
+        if (isBootEvent || action == ACTION_WATCHDOG) {
+            val active = if (isBootEvent) {
+                LockManager.restoreLockAfterBoot(context)
+            } else {
+                LockManager.isLocked(context)
+            }
+
+            if (active) {
                 LockManager.enforceSilentAndDnd(context)
-                val serviceIntent = Intent(context, LockForegroundService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
-                }
+                LockManager.startLockServiceAndOverlay(context)
+                LockManager.scheduleWatchdog(context)
             }
         }
     }
